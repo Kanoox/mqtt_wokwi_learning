@@ -1,0 +1,15 @@
+# Environnement virtuel
+env/
+
+# Fichiers de base de données
+*.db
+
+# Fichiers Python compilés
+__pycache__/
+*.pyc
+
+# Fichiers système
+.DS_Store 
+
+#Fichier env
+.env
