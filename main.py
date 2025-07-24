@@ -1,3 +1,4 @@
+# === main.py ===
 import sqlite3
 import json
 from datetime import datetime
@@ -5,16 +6,14 @@ import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # Charge les variables du fichier .env
-
-## Données MQTT ## 
+load_dotenv()
 MQTT_BROKER_IP = os.getenv("MQTT_BROKER_IP")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
 
 conn = sqlite3.connect("capteur_multi.db", check_same_thread=False)
 cur = conn.cursor()
 
-# Créer les tables si elles n'existent pas
+# Tables
 cur.execute("""
 CREATE TABLE IF NOT EXISTS sensors (
     id TEXT PRIMARY KEY,
@@ -23,6 +22,7 @@ CREATE TABLE IF NOT EXISTS sensors (
     longitude REAL NOT NULL
 )
 """)
+
 cur.execute("""
 CREATE TABLE IF NOT EXISTS measurements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,24 +49,21 @@ def on_message(client, userdata, msg):
         lon = payload["longitude"]
         timestamp = datetime.now().isoformat()
 
-        # Insérer capteur s’il n'existe pas
-        cur.execute("""
-        INSERT OR IGNORE INTO sensors (id, type, latitude, longitude)
-        VALUES (?, ?, ?, ?)""", (sensor_id, sensor_type, lat, lon))
-
-        # Insérer mesure
-        cur.execute("""
-        INSERT INTO measurements (sensor_id, timestamp, value)
-        VALUES (?, ?, ?)""", (sensor_id, timestamp, value))
-
+        # Insérer ou mettre à jour capteur
         cur.execute("""
         INSERT INTO sensors (id, type, latitude, longitude)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET latitude=excluded.latitude, longitude=excluded.longitude
         """, (sensor_id, sensor_type, lat, lon))
 
+        # Insérer mesure
+        cur.execute("""
+        INSERT INTO measurements (sensor_id, timestamp, value)
+        VALUES (?, ?, ?)
+        """, (sensor_id, timestamp, value))
+
         conn.commit()
-        print(f"[{timestamp}] {sensor_id} → {value}")
+        print(f"[{timestamp}] {sensor_id} ({sensor_type}) → {value}")
 
     except Exception as e:
         print("Erreur MQTT :", e)

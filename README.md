@@ -2,6 +2,24 @@
 
 Ce projet permet de recevoir des données de température via MQTT, de les stocker dans une base de données SQLite et de les visualiser via un tableau de bord Python.
 
+## Niveau 3 - Système d’arrosage automatique
+
+Ce niveau consiste à réaliser un système d’arrosage automatique avec Wokwi.
+
+- **Matériel simulé** : ESP32 + servo moteur (pour la vanne d’arrosage)
+- **Fonctionnement** :
+  - Le servo moteur a deux positions : ouverte (arrosage activé) et fermée (arrosage désactivé).
+  - L’arrosage peut être déclenché :
+    - Manuellement, en envoyant un message MQTT depuis votre système.
+    - Automatiquement, si la moyenne des valeurs des capteurs d’humidité passe sous un seuil défini.
+- **Communication** :
+  - Le système reçoit les ordres d’arrosage via MQTT.
+  - Les capteurs d’humidité envoient leurs valeurs via MQTT (voir simulation Wokwi).
+
+**Simulation Wokwi** :  
+Utilisez Wokwi pour simuler l’ESP32, le servo moteur et les capteurs d’humidité.  
+Le code Python permet d’envoyer les commandes MQTT pour piloter l’arrosage.
+
 ## Fonctionnalités
 - Connexion à un broker MQTT
 - Réception de messages de température
