@@ -4,9 +4,13 @@ Ce projet permet de recevoir des données de température via MQTT, de les stock
 
 ## Fonctionnalités
 - Connexion à un broker MQTT
-- Réception de messages de température
-- Stockage des données dans une base SQLite
-- Visualisation des données via un dashboard Python
+- Réception de données capteurs (température & humidité)
+- Stockage dans une base SQLite
+- Visualisation via un dashboard Streamlit
+- Carte interactive avec position GPS des capteurs
+- **Gestion de plusieurs arroseurs indépendants**, chacun associé à un capteur d'humidité
+- **Arrosage automatique** si l’humidité mesurée est sous un seuil défini
+- **Contrôle manuel** des arroseurs via interface graphique
 
 ## Installation
 1. Clonez le dépôt :
@@ -31,7 +35,7 @@ Ce projet permet de recevoir des données de température via MQTT, de les stock
    ```
 
 5. (Optionnel) Pour simuler des capteurs et tester l'envoi de données MQTT, utilisez le projet Wokwi suivant :
-   - Accédez à la simulation Wokwi : [Simulation ESP32 double DHT sur Wokwi](https://wokwi.com/projects/437364276739113985)
+   - Accédez à la simulation Wokwi : [Simulation ESP32 double DHT sur Wokwi](https://wokwi.com/projects/437457486740084737)
    - Cliquez sur "Start Simulation" pour lancer l'envoi de données vers le broker MQTT.
    - Les données publiées sur le topic `wokwi/sensor/temperature` et `wokwi/sensor/humidity` seront automatiquement reçues par ce projet Python.
 
@@ -44,10 +48,15 @@ Ce projet permet de recevoir des données de température via MQTT, de les stock
   ```bash
   python dashboard.py
   ```
+- Pour nettoyer la base de données (suppression des capteurs inactifs ou sans mesures) :
+  ```bash
+  python cleanup.py
+  ```
 
 ## Fichiers principaux
 - `main.py` : réception et stockage des données MQTT
 - `dashboard.py` : visualisation des données
+- `cleanup.py` : script de nettoyage de la base de données (suppression des capteurs inactifs ou sans mesures)
 - `requirements.txt` : dépendances Python
 - `.env`: Fichier d'environnement pour stocker des valeurs secrètes.
 

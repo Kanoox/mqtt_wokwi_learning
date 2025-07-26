@@ -3,11 +3,18 @@ import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
 import pydeck as pdk
+import paho.mqtt.publish as publish
 from streamlit_autorefresh import st_autorefresh
+from dotenv import load_dotenv
+import os
 
 # --- Configuration Streamlit ---
 st.set_page_config(page_title="Dashboard Multi-Capteurs", layout="wide")
 st_autorefresh(interval=10_000, key="refresh")
+
+# === Chargement des variables d'environnement ===
+load_dotenv()
+MQTT_BROKER_IP = os.getenv("MQTT_BROKER_IP")
 
 # --- Chargement des données depuis SQLite ---
 @st.cache_data(ttl=5)
@@ -21,16 +28,23 @@ sensors_df, data_df = load_data()
 
 # --- Filtres latéraux ---
 st.sidebar.title("🧭 Filtres")
+
+# Type de capteur
 sensor_types = sensors_df["type"].unique().tolist()
 selected_types = st.sidebar.multiselect("Type de capteurs", sensor_types, default=sensor_types)
 
+# Capteurs filtrés par type
 filtered_sensors = sensors_df[sensors_df["type"].isin(selected_types)]
+
+# Multiselect dynamique : uniquement les capteurs du type sélectionné
 selected_sensor_ids = st.sidebar.multiselect(
     "Capteurs à afficher",
-    options=filtered_sensors["id"],
-    default=filtered_sensors["id"]
+    options=filtered_sensors["id"].tolist(),
+    default=filtered_sensors["id"].tolist(),
+    key="sensor_select"
 )
 
+# Données filtrées pour la carte et les graphiques
 filtered_data = data_df[data_df["sensor_id"].isin(selected_sensor_ids)]
 
 # --- Carte interactive avec info-bulle ---
@@ -65,9 +79,11 @@ else:
     }
 
     st.subheader("📍 Coordonnées des capteurs sélectionnés")
-    st.dataframe(filtered_sensors[["id", "type", "latitude", "longitude"]])
-
-
+    if selected_sensor_ids:
+        display_sensors = filtered_sensors[filtered_sensors["id"].isin(selected_sensor_ids)]
+        st.dataframe(display_sensors[["id", "type", "latitude", "longitude"]])
+    else:
+        st.info("Aucun capteur sélectionné.")
 
     if len(selected_sensor_ids) > 0:
         sensor_id_center = selected_sensor_ids[0]
@@ -86,14 +102,52 @@ else:
         bearing=0
     )
 
-
-
     st.pydeck_chart(pdk.Deck(
         layers=[layer],
         initial_view_state=view_state,
         tooltip=tooltip,
         map_style=None
     ))
+
+    # === Commande des arroseurs ===
+    st.sidebar.markdown("## 💧 Commande des arroseurs")
+
+    humidity_sensors = filtered_sensors[filtered_sensors["type"] == "humidity"]
+
+    if humidity_sensors.empty:
+        st.sidebar.info("Aucun capteur d'humidité disponible pour le contrôle.")
+    else:
+        threshold = st.sidebar.slider("Seuil automatique d'humidité (%)", 0, 100, 30)
+        st.sidebar.markdown("Arrosoir automatique s'active si dernière valeur d'humidité < au seuil automatique")
+
+        for _, row in humidity_sensors.iterrows():
+            sensor_id = row["id"]
+            lat, lon = row["latitude"], row["longitude"]
+            topic = f"arrosage/commande/{sensor_id}"
+
+            st.sidebar.markdown(f"### 🌿 Arroseur `{sensor_id}`")
+            st.sidebar.markdown(f"- 📍 `{lat}, {lon}`")
+
+            capteur_data = data_df[data_df["sensor_id"] == sensor_id]
+            if not capteur_data.empty:
+                latest = capteur_data.sort_values("timestamp", ascending=False).iloc[0]
+                st.sidebar.markdown(f"- Dernière humidité : `{latest['value']:.2f} %`")
+                if latest['value'] < threshold:
+                    publish.single(topic, payload="ON", hostname=MQTT_BROKER_IP)
+                    st.sidebar.success(f"✅ Arroseur `{sensor_id}` activé automatiquement")
+                else:
+                    publish.single(topic, payload="OFF", hostname=MQTT_BROKER_IP)
+                    st.sidebar.info(f"🚫 Arroseur `{sensor_id}` désactivé automatiquement")
+
+
+            col1, col2 = st.sidebar.columns(2)
+            if col1.button(f"Activer {sensor_id}", key=f"on_{sensor_id}"):
+                publish.single(topic, payload="ON", hostname=MQTT_BROKER_IP)
+                st.sidebar.success(f"✅ Arroseur `{sensor_id}` ACTIVÉ")
+
+            if col2.button(f"Désactiver {sensor_id}", key=f"off_{sensor_id}"):
+                publish.single(topic, payload="OFF", hostname=MQTT_BROKER_IP)
+                st.sidebar.info(f"🚫 Arroseur `{sensor_id}` DÉSACTIVÉ")
 
 # --- Statistiques par type ---
 st.subheader("📊 Statistiques par type de capteur")
@@ -115,11 +169,10 @@ for sensor_id in selected_sensor_ids:
     sensor_type = sensors_df[sensors_df["id"] == sensor_id]["type"].values[0]
     sensor_data = filtered_data[filtered_data["sensor_id"] == sensor_id]
     if not sensor_data.empty:
+        sensor_data = sensor_data.copy()
         sensor_data["rolling"] = sensor_data["value"].rolling(window=5).mean()
-        
-        # --- Affiche position du capteur sélectionné ---
-        sensor_info = map_data[map_data["id"] == str(selected_sensor_ids[0])].iloc[0]
 
+        sensor_info = map_data[map_data["id"] == str(sensor_id)].iloc[0]
         lat, lon = sensor_info["latitude"], sensor_info["longitude"]
 
         st.markdown(f"### 📟 Capteur `{sensor_id}` ({sensor_type})")
