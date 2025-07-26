@@ -1,3 +1,4 @@
+# === main.py ===
 import sqlite3
 import json
 from datetime import datetime
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS sensors (
     longitude REAL NOT NULL
 )
 """)
+
 cur.execute("""
 CREATE TABLE IF NOT EXISTS measurements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
